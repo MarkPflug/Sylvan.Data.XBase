@@ -649,8 +649,6 @@ namespace Sylvan.Data.XBase
 			}
 		}
 
-#if DEBUG
-
 		byte[] GetRecordBytes(int ordinal)
 		{
 			var col = this.columns[ordinal];
@@ -658,6 +656,8 @@ namespace Sylvan.Data.XBase
 			Buffer.BlockCopy(this.recordBuffer, col.offset, buffer, 0, col.length);
 			return buffer;
 		}
+
+#if DEBUG
 
 		char[] GetRecordChars(int ordinal)
 		{
