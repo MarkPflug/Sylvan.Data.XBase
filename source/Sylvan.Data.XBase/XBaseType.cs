@@ -20,4 +20,12 @@
 		VarChar = (byte)'V',
 		Blob = (byte)'W',
 	}
+
+	static class XBaseTypeExtensions
+	{
+		public static bool IsLongType(this XBaseType type)
+		{
+			return type == XBaseType.Memo || type == XBaseType.Blob;
+		}
+	}
 }

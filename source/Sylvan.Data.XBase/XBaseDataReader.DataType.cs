@@ -422,6 +422,18 @@ namespace Sylvan.Data.XBase
 		{
 			public static readonly DateTimeAccessor Instance = new DateTimeAccessor();
 
+			public override bool CanBeNull => true;
+
+			public override bool IsDBNull(XBaseDataReader dr, int ordinal)
+			{
+				var col = dr.columns[ordinal];
+				var o = col.offset;
+				var b = dr.recordBuffer;
+				var date = BitConverter.ToInt32(b, o);
+				var time = BitConverter.ToInt32(b, o + 4);
+				return date == 0 && time == 0;
+			}
+
 			public override DateTime GetDateTime(XBaseDataReader dr, int ordinal)
 			{
 				var col = dr.columns[ordinal];
@@ -511,6 +523,16 @@ namespace Sylvan.Data.XBase
 				var count = Math.Min(varLen - dataOffset, length);
 				Buffer.BlockCopy(dr.recordBuffer, col.offset + dataOffset, buffer, bufferOffset, count);
 				return count;
+			}
+		}
+
+		sealed class MissingMemoAccessor : DataAccessor
+		{
+			public static MissingMemoAccessor Instance = new MissingMemoAccessor();
+
+			public override bool IsDBNull(XBaseDataReader dr, int ordinal)
+			{
+				return true;
 			}
 		}
 

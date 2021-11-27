@@ -57,26 +57,27 @@ namespace Sylvan.Data.XBase
 				get;
 			}
 
-			public XBaseColumn(int ordinal, string name, int offset, int length, XBaseType type, int decimalCount, bool isNullable, bool isSystem)
+			public XBaseColumn(XBaseDataReader reader, int ordinal, string name, int offset, int length, XBaseType type, int decimalCount, bool isNullable, bool isSystem)
 			{
 				this.ColumnOrdinal = ordinal;
 				this.ColumnName = name;
 				this.offset = offset;
 				this.length = length;
-				this.ColumnSize = length;
+				this.IsLong = type.IsLongType();
+				this.ColumnSize = this.IsLong == true ? int.MaxValue : length;
 				this.DBaseDataType = type;
 				this.DataType = GetType(type);
 				this.DataTypeName = type.ToString();
 				this.decimalCount = decimalCount;
-				
+
 				this.IsHidden = isSystem;
 
-				var acc = GetAccessor(type);
+				var acc = length == 0 ? NullAccessor.Instance : GetAccessor(reader, type);
 				this.accessor = isNullable ? new FoxProNullAccessor(acc) : acc;
 				this.AllowDBNull = accessor.CanBeNull;
 			}
 
-			DataAccessor GetAccessor(XBaseType type)
+			DataAccessor GetAccessor(XBaseDataReader reader, XBaseType type)
 			{
 				switch (type)
 				{
@@ -105,7 +106,14 @@ namespace Sylvan.Data.XBase
 					case XBaseType.Blob:
 						return BlobAccessor.Instance;
 					case XBaseType.Memo:
-						return MemoAccessor.Instance;
+						if (reader.memoStream == null)
+						{
+							return MissingMemoAccessor.Instance;
+						}
+						else
+						{
+							return MemoAccessor.Instance;
+						}
 					case XBaseType.NullFlags:
 						return NullFlagsAccessor.Instance;
 					default:
@@ -158,8 +166,13 @@ namespace Sylvan.Data.XBase
 
 		Stream stream;
 		Stream? memoStream;
+
 		XBaseColumn[] columns;
 		XBaseColumn? nullFlagsColumn;
+
+		bool ownsStreams;
+
+		bool readDeletedRecords;
 
 		bool isClosed;
 		int recordIdx;
@@ -194,14 +207,41 @@ namespace Sylvan.Data.XBase
 			AutoIncrementing = 0x0c,
 		}
 
+		public static XBaseDataReader Create(string dataFile, XBaseDataReaderOptions? options = null)
+		{
+			var stream = File.OpenRead(dataFile);
+			var reader = CreateAsync(stream, null, options).GetAwaiter().GetResult();
+			reader.ownsStreams = true;
+			return reader;
+		}
+
+		public static XBaseDataReader Create(string dataFile, string memoFile, XBaseDataReaderOptions? options = null)
+		{
+			var dataStream = File.OpenRead(dataFile);
+			var memoStream = File.OpenRead(memoFile);
+			var reader = CreateAsync(dataStream, memoStream, options).GetAwaiter().GetResult();
+			reader.ownsStreams = true;
+			return reader;
+		}
+
 		public static XBaseDataReader Create(Stream stream)
 		{
 			return CreateAsync(stream, null).GetAwaiter().GetResult();
 		}
 
-		public static XBaseDataReader Create(Stream stream, Stream? memoStream)
+		public static XBaseDataReader Create(Stream stream, XBaseDataReaderOptions options)
+		{
+			return CreateAsync(stream, null, options).GetAwaiter().GetResult();
+		}
+
+		public static XBaseDataReader Create(Stream stream, Stream memoStream)
 		{
 			return CreateAsync(stream, memoStream).GetAwaiter().GetResult();
+		}
+
+		public static XBaseDataReader Create(Stream stream, Stream memoStream, XBaseDataReaderOptions options)
+		{
+			return CreateAsync(stream, memoStream, options).GetAwaiter().GetResult();
 		}
 
 		public static Task<XBaseDataReader> CreateAsync(Stream stream, XBaseDataReaderOptions? options = null)
@@ -221,6 +261,7 @@ namespace Sylvan.Data.XBase
 		{
 			this.stream = stream;
 			this.memoStream = memoStream;
+			this.ownsStreams = false;
 			this.columns = Array.Empty<XBaseColumn>();
 			this.encoding = Encoding.Default;
 			this.recordBuffer = Array.Empty<byte>();
@@ -231,6 +272,7 @@ namespace Sylvan.Data.XBase
 
 		async Task InitializeAsync(XBaseDataReaderOptions options)
 		{
+			this.readDeletedRecords = options.ReadDeletedRecords;
 			var buffer = new byte[0x20];
 			var p = 0;
 			var len = await stream.ReadAsync(buffer, 0, buffer.Length);
@@ -250,10 +292,10 @@ namespace Sylvan.Data.XBase
 			var flags = (DBaseFileFlags)buffer[0x1c];
 			var langId = buffer[0x1d];
 
-			if(options.Encoding != null)
+			if (options.Encoding != null)
 			{
 				this.encoding = options.Encoding;
-			} 
+			}
 			else
 			{
 				if (langId == 0)
@@ -272,7 +314,7 @@ namespace Sylvan.Data.XBase
 						throw new EncodingNotSupportedException(langId);
 					}
 				}
-			}			
+			}
 
 			var fields = new List<XBaseColumn>(16);
 
@@ -299,7 +341,8 @@ namespace Sylvan.Data.XBase
 					throw new InvalidDataException();
 				p += len;
 				var name = ReadZString(buffer, 0, 10);
-				var type = (XBaseType)buffer[0x0b];
+				var typeCode = buffer[0x0b];
+				var type = (XBaseType)typeCode;
 				var decimalCount = (byte)0;
 				var fieldLength = 0;
 
@@ -328,13 +371,17 @@ namespace Sylvan.Data.XBase
 
 				if (system)
 				{
-
 					// TODO: hide these?
 					// currently I only know of the foxpro nullflags column
 					// which is special-cased below.
 				}
 
-				var field = new XBaseColumn(i, name, fieldOffset, fieldLength, type, decimalCount, nullable, system);
+				var field = new XBaseColumn(this, i, name, fieldOffset, fieldLength, type, decimalCount, nullable, system);
+
+				if (!system && field.DataType == typeof(object) && options.IgnoreUnsupportedTypes == false)
+				{
+					throw new UnsupportedColumnTypeException(i, name, typeCode);
+				}
 
 				switch (field.DBaseDataType)
 				{
@@ -371,7 +418,7 @@ namespace Sylvan.Data.XBase
 				len = memoStream.Read(memoBuffer, 0, memoBuffer.Length);
 			}
 
-			this.columns = fields.Where(f => f.IsHidden == false).ToArray();
+			this.columns = fields.Where(f => f.IsHidden != true).ToArray();
 			this.nullFlagsColumn = fields.FirstOrDefault(f => f.IsHidden == true && f.ColumnName == "_NullFlags");
 
 			var remainingHeaderLength = headerLength - p;
@@ -405,6 +452,8 @@ namespace Sylvan.Data.XBase
 			}
 			return encoding.GetString(buffer, offset, i);
 		}
+
+		public bool IsDeletedRow { get; private set; }
 
 		public override object this[int ordinal] => this.GetValue(ordinal);
 
@@ -596,11 +645,12 @@ namespace Sylvan.Data.XBase
 				case TypeCode.String:
 					return this.GetString(ordinal);
 				default:
-					return this.GetString(ordinal);
+					return this.GetRecordBytes(ordinal);
 			}
 		}
 
 #if DEBUG
+
 		byte[] GetRecordBytes(int ordinal)
 		{
 			var col = this.columns[ordinal];
@@ -682,43 +732,67 @@ namespace Sylvan.Data.XBase
 
 		public override bool Read()
 		{
-			do
+			var recordLen = this.recordLength;
+
+			while (true)
 			{
-				var recordLen = this.recordLength;
 				if (recordIdx >= this.recordCount)
 				{
 					return false;
 				}
 				recordIdx++;
-				var len = stream.Read(recordBuffer, 0, recordLen);
-				if (len < recordLen)
+
+				// as of .NET 6, Read can return fewer than the requested 
+				// number of bytes when reading from certain streams that
+				// previously would guarantee a full block, so this loop
+				// ensures we read the entire record.
+				while (recordLen > 0)
 				{
-					throw new InvalidDataException();
+					var c = stream.Read(recordBuffer, 0, recordLen);
+					recordLen -= c;
+					if (c == 0)
+					{
+						throw new InvalidDataException();
+					}
 				}
+				this.IsDeletedRow = recordBuffer[0] != ' ';
+				if (IsDeletedRow && this.readDeletedRecords == false)
+				{
+					continue;
+				}
+				break;
 			}
-			while (recordBuffer[0] != ' ');
 
 			return true;
 		}
 
 		public override async Task<bool> ReadAsync(CancellationToken cancellationToken)
 		{
-			do
+			var recordLen = this.recordLength;
+
+			while (true)
 			{
-				var recordLen = this.recordLength;
 				if (recordIdx >= this.recordCount)
 				{
 					return false;
 				}
 				recordIdx++;
-				var len = await stream.ReadAsync(recordBuffer, 0, recordLen, cancellationToken);
-				if (len < recordLen)
+				while (recordLen > 0)
 				{
-					throw new InvalidDataException();
+					var c = await stream.ReadAsync(recordBuffer, 0, recordLen);
+					recordLen -= c;
+					if (c == 0)
+					{
+						throw new InvalidDataException();
+					}
 				}
-				cancellationToken.ThrowIfCancellationRequested();
+				this.IsDeletedRow = recordBuffer[0] != ' ';
+				if (IsDeletedRow && this.readDeletedRecords == false)
+				{
+					continue;
+				}
+				break;
 			}
-			while (recordBuffer[0] != ' ');
 
 			return true;
 		}
@@ -738,7 +812,11 @@ namespace Sylvan.Data.XBase
 			this.isClosed = true;
 			if (disposing)
 			{
-				this.stream.Dispose();
+				if (ownsStreams)
+				{
+					this.stream.Dispose();
+					this.memoStream?.Dispose();
+				}
 			}
 			base.Dispose(disposing);
 		}

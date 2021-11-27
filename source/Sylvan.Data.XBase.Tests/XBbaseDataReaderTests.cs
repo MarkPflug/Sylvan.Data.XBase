@@ -1,226 +1,256 @@
-//using System;
-//using System.Data;
-//using System.IO;
-//using System.IO.Compression;
-//using System.Net.Http;
-//using System.Text;
-//using Xunit;
+using System;
+using System.Data;
+using System.IO;
+using System.IO.Compression;
+using System.Net.Http;
+using System.Text;
+using Xunit;
 
-//namespace Sylvan.Data.XBase.Tests
-//{
+namespace Sylvan.Data.XBase
+{
+	public class EncodingsFixture
+	{
+		public EncodingsFixture()
+		{
+#if NETCOREAPP1_0_OR_GREATER
+			// encodings are available by default on net461
+			Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+#endif
+		}
+	}
 
-//	public class EncodingsFixture
-//	{
-//		public EncodingsFixture()
-//		{
-//#if NET5_0
-//			// encodings are available by default on net461
-//			Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
-//#endif
-//		}
-//	}
+	public class XBbaseDataReaderTests : IClassFixture<EncodingsFixture>
+	{
+		const string DataSetUrl = "https://www2.census.gov/geo/tiger/GENZ2018/shp/cb_2018_us_county_20m.zip";
+		const string BigDataSetUrl = "https://prd-tnm.s3.amazonaws.com/StagedProducts/GovtUnit/Shape/GOVTUNIT_Oregon_State_Shape.zip";
 
-//	public class XBbaseDataReaderTests : IClassFixture<EncodingsFixture>
-//	{
-//		const string DataFileName = "data.zip";
-//		const string DBaseFileName = "data.dbf";
-//		const string DataSetUrl = "https://www2.census.gov/geo/tiger/GENZ2018/shp/cb_2018_us_county_20m.zip";
+		(string shapeFile, string dbfFile) Cache(string url, string dbfFileName = null)
+		{
+			var uri = new Uri(url);
+			var shapeFileName = Path.GetFileName(uri.PathAndQuery);
 
-//		readonly byte[] CachedData;
+			if (!File.Exists(shapeFileName))
+			{
+				using var oStream = File.Create(shapeFileName);
+				using var iStream = new HttpClient().GetStreamAsync(url).Result;
+				iStream.CopyTo(oStream);
+			}
 
-//		public XBbaseDataReaderTests()
-//		{
-//			if (!File.Exists(DataFileName))
-//			{
-//				{
-//					using var oStream = File.OpenWrite(DataFileName);
-//					using var iStream = new HttpClient().GetStreamAsync(DataSetUrl).Result;
-//					iStream.CopyTo(oStream);
-//				}
-//				{
-//					using var stream = File.OpenRead(DataFileName);
-//					var za = new ZipArchive(stream, ZipArchiveMode.Read);
-//					var entry = za.GetEntry("cb_2018_us_county_20m.dbf");
-//					using var oStream = File.Create(DBaseFileName);
-//					using var iStream = entry.Open();
-//					iStream.CopyTo(oStream);
-//				}
-//			}
-//			CachedData = File.ReadAllBytes(DBaseFileName);
-//		}
+			dbfFileName = dbfFileName ?? Path.GetFileNameWithoutExtension(shapeFileName) + ".dbf";
 
-//		Stream GetDBaseStream()
-//		{
-//			return new MemoryStream(CachedData);
-//		}
+			if (!File.Exists(dbfFileName))
+			{
+				var za = ZipFile.OpenRead(shapeFileName);
+				var entry = za.GetEntry(dbfFileName);
+				if (entry == null)
+				{
+					entry = za.GetEntry("Shape/" + dbfFileName);
+				}
 
-//		[Fact]
-//		public void TestBig()
-//		{
-//			using var stream = File.OpenRead(@"C:\users\mark\downloads\data\GU_PLSSFirstDivision.dbf");
-//			var r = XBaseDataReader.Create(stream);
-//			var schema = r.GetColumnSchema();
+				entry.ExtractToFile(dbfFileName);
+			}
+			return (shapeFileName, dbfFileName);
+		}
 
-//			var a = new SchemaAnalyzer();
-//			var result = a.Analyze(r);
-//			r.Process();
-//		}
+		[Fact]
+		public void TestBig()
+		{
+			var (sf, df) = Cache(BigDataSetUrl, "GU_PLSSFirstDivision.dbf");
+			var r = XBaseDataReader.Create(df);
+			var schema = r.GetColumnSchema();
 
-//		[Fact]
-//		public void TestOnline()
-//		{
-//			var fileName = @"C:\Users\Mark\Downloads\cb_2018_us_cd116_20m.zip";
-//			var za = ZipFile.OpenRead(fileName);
-//			var entry = za.GetEntry(Path.GetFileNameWithoutExtension(fileName) + ".dbf");
-//			using var stream = entry.Open();
-//			var dr = XBaseDataReader.Create(stream);
+			while (r.Read())
+			{
+				ProcessRecord(r);
+			}
+		}				
 
-//			var dt = new DataTable();
-//			dt.TableName = Path.GetFileNameWithoutExtension(fileName);
-//			dt.Load(dr);
-//			var sw = new StringWriter();
-//			dt.WriteXml(sw);
-//			var str = sw.ToString();
-//		}
+		[Fact]
+		public void TestOnline()
+		{
+			var (shapeFile, fileName) = Cache(DataSetUrl);
+			var dr = XBaseDataReader.Create(fileName);
 
-//		[Fact]
-//		public void Test1()
-//		{
-//			using var stream = GetDBaseStream();
-//			var r = XBaseDataReader.Create(stream);
-//			Process(r);
-//		}
+			var dt = new DataTable();
+			dt.TableName = Path.GetFileNameWithoutExtension(fileName);
+			dt.Load(dr);
+			var sw = new StringWriter();
+			dt.WriteXml(sw);
+			var str = sw.ToString();
+		}
 
-//		[Fact]
-//		public void TestEnc()
-//		{
-//			using var stream = File.OpenRead(@"Data/vc2.dbf");
-//			var r = XBaseDataReader.Create(stream);
-//			Process(r);
-//		}
+		[Fact]
+		public void TestEnc()
+		{
+			using var stream = File.OpenRead(@"Data/vc2.dbf");
+			var r = XBaseDataReader.Create(stream);
+			Process(r);
+		}
 
-//		[Fact]
-//		public void TestZip()
-//		{
-//			using var zs = File.OpenRead(DataFileName);
-//			var za = new ZipArchive(zs, ZipArchiveMode.Read);
-//			var entry = za.GetEntry("cb_2018_us_county_20m.dbf");
+		[Fact]
+		public void TestZip()
+		{
+			var (sf, df) = Cache(DataSetUrl);
+			using var zs = File.OpenRead(sf);
+			var za = new ZipArchive(zs, ZipArchiveMode.Read);
+			var entry = za.GetEntry("cb_2018_us_county_20m.dbf");
 
-//			using var stream = entry.Open();
-//			var r = XBaseDataReader.Create(stream);
-//			Process(r);
-//		}
+			using var stream = entry.Open();
+			var r = XBaseDataReader.Create(stream);
+			Process(r);
+		}
 
-//		[Fact]
-//		public void Test2()
-//		{
-//			// TODO: add option to skip unknown types.
-//			Proc("data/FolderRoot.dbf");
-//		}
+		[Fact]
+		public void Sample()
+		{
+			var r = XBaseDataReader.Create("Data/Sample.dbf", "Data/Sample.fpt");
+			while (r.Read())
+			{
+				ProcessRecord(r);
+			}
+		}
 
-//		[Fact]
-//		public void Test3()
-//		{
-//			Proc("data/data2.dbf", "data/data2.fpt");
-//		}
+		[Fact]
+		public void UnsupportedType()
+		{
+			Assert.Throws<UnsupportedColumnTypeException>(() => XBaseDataReader.Create("Data/FolderRoot.dbf"));
+		}
 
-//		[Fact]
-//		public void Numbers()
-//		{
-//			Proc("data/numbers.dbf");
-//		}
+		[Fact]
+		public void UnsupportedTypeAsBinary()
+		{
+			var opts = new XBaseDataReaderOptions { IgnoreUnsupportedTypes = true };
+			var r = XBaseDataReader.Create("Data/FolderRoot.dbf", opts);
 
-//		[Fact]
-//		public void Numbers2()
-//		{
-//			Proc("data/number2.dbf");
-//		}
+			while (r.Read())
+			{
+				var str = r.GetValue(9);
+			}
+		}
 
-//		[Fact]
-//		public void Curr()
-//		{
-//			Proc("data/cur.dbf");
-//		}
+		[Fact]
+		public void Test3()
+		{
+			Proc("Data/data2.dbf", "Data/data2.fpt");
+		}
 
-//		[Fact]
-//		public void Numbers4()
-//		{
-//			var name = "data/num3.dbf";
-//			using var stream = File.OpenRead(name);
-//			var r = XBaseDataReader.Create(stream);
-//			while (r.Read())
-//			{
-//				var a = r.TryGetDecimal(0);
-//				var b = r.TryGetDecimal(1);
-//				var c = r.TryGetDecimal(2);
-//			}
-//		}
+		[Fact]
+		public void Numbers()
+		{
+			Proc("Data/numbers.dbf");
+		}
 
-//		[Fact]
-//		public void Varchar()
-//		{
-//			Proc("data/nulltest.dbf");
-//		}
+		[Fact]
+		public void Numbers2()
+		{
+			Proc("Data/number2.dbf");
+		}
 
-//		[Fact]
-//		public void MemoTest()
-//		{
-//			Proc("data/nulltest.dbf");
-//		}
+		[Fact]
+		public void Curr()
+		{
+			Proc("Data/cur.dbf");
+		}
 
-//		[Fact]
-//		public void A()
-//		{
-//			var ds = File.OpenRead(@"C:\users\mark\desktop\memobintest.dbf");
-//			var ms = File.OpenRead(@"C:\users\mark\desktop\memobintest.fpt");
-//			var dr = XBaseDataReader.Create(ds, ms);
-//			while (dr.Read())
-//			{
-//				var str = dr.GetString(0);
+		[Fact]
+		public void Numbers4()
+		{
+			var name = "Data/num3.dbf";
+			using var stream = File.OpenRead(name);
+			var r = XBaseDataReader.Create(stream);
+			while (r.Read())
+			{
+				var a = r.GetDecimal(0);
+				var b = r.GetDecimal(1);
+				var c = r.GetDecimal(2);
+			}
+		}
 
-//				var mss = new MemoryStream();
-//				var bin = dr.GetStream(1);
-//				bin.CopyTo(mss);
-//				var ss = Encoding.ASCII.GetString(mss.GetBuffer());
+		[Fact]
+		public void Varchar()
+		{
+			Proc("Data/nulltest.dbf");
+		}
 
-//			}
-//		}
+		[Fact]
+		public void MemoTest()
+		{
+			Proc("Data/nulltest.dbf");
+		}
 
-//		void Proc(string name, string memoName = null)
-//		{
-//			using var stream = File.OpenRead(name);
-//			using var memoStream = memoName == null ? null : File.OpenRead(memoName);
-//			var r = XBaseDataReader.Create(stream, memoStream);
-//			Process(r);
-//		}
+		[Fact]
+		public void A()
+		{
+			var ds = File.OpenRead("Data/memobintest.dbf");
+			var ms = File.OpenRead("Data/memobintest.fpt");
+			var dr = XBaseDataReader.Create(ds, ms);
+			while (dr.Read())
+			{
+				var str = dr.GetString(0);
 
-//		void Process(XBaseDataReader r)
-//		{
-//			var schema = r.GetColumnSchema();
-//			var ss = new Schema(r);
-//			var spec = ss.ToString();
-//			var c = 0;
-//			var sb = new StringBuilder();
-//			while (r.Read())
-//			{
-//				r.ProcessRecord();
-//				c++;
-//			}
-//		}
-//	}
+				var mss = new MemoryStream();
+				var bin = dr.GetStream(1);
+				bin.CopyTo(mss);
+				var ss = Encoding.ASCII.GetString(mss.GetBuffer());
 
-//	static class Ex
-//	{
-//		public static decimal? TryGetDecimal(this IDataReader dr, int ord)
-//		{
-//			try
-//			{
-//				return dr.GetDecimal(ord);
-//			}
-//			catch
-//			{
-//				return null;
-//			}
-//		}
-//	}
-//}
+			}
+		}
+
+		void Proc(string name, string memoName = null)
+		{
+			using var stream = File.OpenRead(name);
+			using var memoStream = memoName == null ? null : File.OpenRead(memoName);
+			var r = XBaseDataReader.Create(stream, memoStream);
+			Process(r);
+		}
+
+		int Process(XBaseDataReader r)
+		{
+			var schema = r.GetColumnSchema();
+			var c = 0;
+			while (r.Read())
+			{
+				ProcessRecord(r);
+				c++;
+			}
+			return c;
+		}
+
+		static void ProcessRecord(IDataRecord record)
+		{
+			for (int i = 0; i < record.FieldCount; i++)
+			{
+				if (record.IsDBNull(i))
+					continue;
+
+				var type = record.GetFieldType(i);
+				var tc = Type.GetTypeCode(type);
+
+				switch (tc)
+				{
+					case TypeCode.Boolean:
+						record.GetBoolean(i);
+						break;
+					case TypeCode.Int32:
+						record.GetInt32(i);
+						break;
+					case TypeCode.DateTime:
+						record.GetDateTime(i);
+						break;
+					case TypeCode.Double:
+						record.GetDouble(i);
+						break;
+					case TypeCode.Decimal:
+						record.GetDecimal(i);
+						break;
+					case TypeCode.String:
+						record.GetString(i);
+						break;
+					default:
+						continue;
+						//throw new NotSupportedException();
+				}
+			}
+		}
+	}
+}
