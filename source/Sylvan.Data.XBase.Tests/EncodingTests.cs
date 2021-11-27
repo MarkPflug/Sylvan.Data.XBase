@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Text;
 using Xunit;
 
-namespace Sylvan.Data.XBase.Tests
+namespace Sylvan.Data.XBase
 {
 	public class EncodingTests
 	{
@@ -11,7 +11,7 @@ namespace Sylvan.Data.XBase.Tests
 		public void VerifyEncodingSupport()
 		{
 
-#if NET5_0
+#if NETCOREAPP1_0_OR_GREATER
 			// encodings are available by default on net461
 			Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
 #endif
@@ -19,30 +19,30 @@ namespace Sylvan.Data.XBase.Tests
 			int[] s =
 				new int[] {
 					437,
-					620 ,
-					737 ,
-					850 ,
-					852 ,
-					857 ,
-					861 ,
-					865 ,
-					866 ,
-					874 ,
-					895 ,
-					932 ,
-					936 ,
-					949 ,
-					950 ,
-					1250 ,
-					1251 ,
-					1252 ,
-					1253 ,
-					1254 ,
-					1255 ,
-					1256 ,
-					10000 ,
-					10006 ,
-					10007 ,
+					620,
+					737,
+					850,
+					852,
+					857,
+					861,
+					865,
+					866,
+					874,
+					895,
+					932,
+					936,
+					949,
+					950,
+					1250,
+					1251,
+					1252,
+					1253,
+					1254,
+					1255,
+					1256,
+					10000,
+					10006,
+					10007,
 					10029
 			};
 

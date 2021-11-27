@@ -1,23 +1,29 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
-  <PropertyGroup>
-    <TargetFrameworks>net6.0;net48</TargetFrameworks>
+	<PropertyGroup>
+		<TargetFramework>net6.0</TargetFramework>
+		<RootNamespace>Sylvan.Data.XBase</RootNamespace>
+		<IsPackable>false</IsPackable>
+	</PropertyGroup>
 
-    <IsPackable>false</IsPackable>
-  </PropertyGroup>
+	<ItemGroup>
+		<PackageReference Include="Sylvan.Data" Version="0.1.0" />
+		<PackageReference Include="Sylvan.Data.Csv" Version="1.1.9" />
+		<PackageReference Include="System.Text.Encoding.CodePages" Version="5.0.0" />
+	</ItemGroup>
 
-  <ItemGroup>
-    <PackageReference Include="System.Text.Encoding.CodePages" Version="5.0.0" />
-  </ItemGroup>
+	<ItemGroup>
+		<ProjectReference Include="..\Sylvan.Data.XBase\Sylvan.Data.XBase.csproj" />
+	</ItemGroup>
 
-  <ItemGroup>
-    <ProjectReference Include="..\Sylvan.Data.XBase\Sylvan.Data.XBase.csproj" />
-  </ItemGroup>
+	<ItemGroup>
+		<None Update="Data\**\*">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+	</ItemGroup>
 
-  <ItemGroup>
-    <None Update="Data\**\*">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-  </ItemGroup>
+	<ItemGroup>
+		<Folder Include="Data\" />
+	</ItemGroup>
 
 </Project>
