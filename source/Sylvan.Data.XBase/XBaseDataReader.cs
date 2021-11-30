@@ -781,19 +781,10 @@ namespace Sylvan.Data.XBase
 				}
 				recordIdx++;
 
-				// as of .NET 6, Read can return fewer than the requested 
-				// number of bytes when reading from certain streams that
-				// previously would guarantee a full block, so this loop
-				// ensures we read the entire record.
-				while (recordLen > 0)
-				{
-					var c = stream.Read(recordBuffer, 0, recordLen);
-					recordLen -= c;
-					if (c == 0)
-					{
-						throw new InvalidDataException();
-					}
-				}
+				var len = ReadBlock(stream, recordBuffer, recordLen);
+				if(len != recordLen)
+					throw new InvalidDataException();
+				
 				this.IsDeletedRow = recordBuffer[0] != ' ';
 				if (IsDeletedRow && this.readDeletedRecords == false)
 				{
@@ -803,6 +794,30 @@ namespace Sylvan.Data.XBase
 			}
 
 			return true;
+		}
+
+		static int ReadBlock(Stream stream, byte[] buffer, int count)
+		{
+			var len = 0;
+			while(len < count)
+			{
+				var c = stream.Read(buffer, len, count - len);
+				if (c == 0) break;
+				len += c;
+			}
+			return len;
+		}
+
+		static async Task<int> ReadBlockAsync(Stream stream, byte[] buffer, int count)
+		{
+			var len = 0;
+			while (len < count)
+			{
+				var c = await stream.ReadAsync(buffer, len, count - len);
+				if (c == 0) break;
+				len += c;
+			}
+			return len;
 		}
 
 		/// <inheritdoc/>
@@ -816,16 +831,11 @@ namespace Sylvan.Data.XBase
 				{
 					return false;
 				}
-				recordIdx++;
-				while (recordLen > 0)
-				{
-					var c = await stream.ReadAsync(recordBuffer, 0, recordLen);
-					recordLen -= c;
-					if (c == 0)
-					{
-						throw new InvalidDataException();
-					}
-				}
+
+				var len = await ReadBlockAsync(stream, recordBuffer, recordLen);
+				if (len != recordLen)
+					throw new InvalidDataException();
+
 				this.IsDeletedRow = recordBuffer[0] != ' ';
 				if (IsDeletedRow && this.readDeletedRecords == false)
 				{
