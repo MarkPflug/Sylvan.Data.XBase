@@ -2,11 +2,16 @@
 
 namespace Sylvan.Data.XBase
 {
+	/// <summary>
+	/// Options for creating <see cref="XBaseDataReader"/>.
+	/// </summary>
 	public sealed class XBaseDataReaderOptions
 	{
 		internal static readonly XBaseDataReaderOptions Default = new XBaseDataReaderOptions();
 
-
+		/// <summary>
+		/// Creates a new <see cref="XBaseDataReaderOptions"/>.
+		/// </summary>
 		public XBaseDataReaderOptions()
 		{
 			IgnoreMissingMemo = false;
