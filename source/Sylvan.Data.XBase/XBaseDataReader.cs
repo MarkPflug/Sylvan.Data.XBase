@@ -1,44 +1,15 @@
-﻿using System;
-using System.Collections;
-using System.Collections.Generic;
+﻿using System.Collections;
 using System.Collections.ObjectModel;
 using System.Data;
 using System.Data.Common;
-using System.IO;
-using System.Linq;
 using System.Net;
 using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace Sylvan.Data.XBase
 {
-	enum XBaseVersion : byte
-	{
-		FoxBase = 0x02,
-		FoxBasePlusNoMemo = 0x03,
-		VisualFoxPro = 0x30,
-		VisualFoxProAutoIncrement = 0x31,
-		VisualFoxProVarField = 0x32,
-		DBase4SqlTableFiles = 0x43,
-		DBase4SqlSystemFiles = 0x63,
-		FoxBasePlusMemo = 0x83,
-		DBase4Memo = 0x8b,
-		DBase4SqlTableFilesMemo = 0xcb,
-		FoxProMemo = 0xf5,
-		FoxBaseEx = 0xfb,
-	}
-
-	[Flags]
-	enum ColumnFlags
-	{
-		None = 0x00,
-		SystemColumn = 0x01,
-		Nullable = 0x02,
-		Binary = 0x03,
-		AutoIncrementing = 0x0c,
-	}
-
+	/// <summary>
+	/// A forward-only data reader for xBase (.dbf) data files.
+	/// </summary>
 	public sealed partial class XBaseDataReader : DbDataReader, IDbColumnSchemaGenerator
 	{
 		class XBaseColumn : DbColumn
@@ -187,8 +158,14 @@ namespace Sylvan.Data.XBase
 		int recordCount;
 
 		XBaseVersion version;
+
+		/// <summary>
+		/// Gets the last modified date of the file.
+		/// </summary>
 		public DateTime ModifiedDate { get; private set; }
-		public override int VisibleFieldCount => columns.Length;
+
+		/// <inheritdoc/>
+		public override int VisibleFieldCount => FieldCount;
 
 		[Flags]
 		enum DBaseFileFlags
@@ -207,6 +184,9 @@ namespace Sylvan.Data.XBase
 			AutoIncrementing = 0x0c,
 		}
 
+		/// <summary>
+		/// Creates a new XBaseDataReader.
+		/// </summary>
 		public static XBaseDataReader Create(string dataFile, XBaseDataReaderOptions? options = null)
 		{
 			var stream = File.OpenRead(dataFile);
@@ -215,6 +195,9 @@ namespace Sylvan.Data.XBase
 			return reader;
 		}
 
+		/// <summary>
+		/// Creates a new XBaseDataReader.
+		/// </summary>
 		public static XBaseDataReader Create(string dataFile, string memoFile, XBaseDataReaderOptions? options = null)
 		{
 			var dataStream = File.OpenRead(dataFile);
@@ -224,31 +207,49 @@ namespace Sylvan.Data.XBase
 			return reader;
 		}
 
+		/// <summary>
+		/// Creates a new XBaseDataReader.
+		/// </summary>
 		public static XBaseDataReader Create(Stream stream)
 		{
 			return CreateAsync(stream, null).GetAwaiter().GetResult();
 		}
 
+		/// <summary>
+		/// Creates a new XBaseDataReader.
+		/// </summary>
 		public static XBaseDataReader Create(Stream stream, XBaseDataReaderOptions options)
 		{
 			return CreateAsync(stream, null, options).GetAwaiter().GetResult();
 		}
 
+		/// <summary>
+		/// Creates a new XBaseDataReader.
+		/// </summary>
 		public static XBaseDataReader Create(Stream stream, Stream memoStream)
 		{
 			return CreateAsync(stream, memoStream).GetAwaiter().GetResult();
 		}
 
+		/// <summary>
+		/// Creates a new XBaseDataReader.
+		/// </summary>
 		public static XBaseDataReader Create(Stream stream, Stream memoStream, XBaseDataReaderOptions options)
 		{
 			return CreateAsync(stream, memoStream, options).GetAwaiter().GetResult();
 		}
 
+		/// <summary>
+		/// Creates a new XBaseDataReader.
+		/// </summary>
 		public static Task<XBaseDataReader> CreateAsync(Stream stream, XBaseDataReaderOptions? options = null)
 		{
 			return CreateAsync(stream, null, options);
 		}
 
+		/// <summary>
+		/// Creates a new XBaseDataReader.
+		/// </summary>
 		public static async Task<XBaseDataReader> CreateAsync(Stream stream, Stream? memoStream, XBaseDataReaderOptions? options = null)
 		{
 			options = options ?? XBaseDataReaderOptions.Default;
@@ -453,33 +454,48 @@ namespace Sylvan.Data.XBase
 			return encoding.GetString(buffer, offset, i);
 		}
 
+		/// <summary>
+		/// Indicates if the current row is marked as deleted.
+		/// Deleted rows are only read when the <see cref="XBaseDataReaderOptions.ReadDeletedRecords"/>
+		/// option is enabled.
+		/// </summary>
 		public bool IsDeletedRow { get; private set; }
 
+		/// <inheritdoc/>
 		public override object this[int ordinal] => this.GetValue(ordinal);
 
+		/// <inheritdoc/>
 		public override object this[string name] => this.GetValue(this.GetOrdinal(name));
 
+		/// <inheritdoc/>
 		public override int Depth => 0;
 
+		/// <inheritdoc/>
 		public override int FieldCount => this.columns.Length;
 
+		/// <inheritdoc/>
 		public override bool HasRows => recordCount > 0;
 
+		/// <inheritdoc/>
 		public override bool IsClosed => isClosed;
 
-		public override int RecordsAffected => recordCount;
+		/// <inheritdoc/>
+		public override int RecordsAffected => 0;
 
+		/// <inheritdoc/>
 		public override bool GetBoolean(int ordinal)
 		{
 			var col = this.columns[ordinal];
 			return col.accessor.GetBoolean(this, ordinal);
 		}
 
+		/// <inheritdoc/>
 		public override byte GetByte(int ordinal)
 		{
 			throw new NotSupportedException();
 		}
 
+		/// <inheritdoc/>
 		public override long GetBytes(int ordinal, long dataOffset, byte[]? buffer, int bufferOffset, int length)
 		{
 			if (dataOffset > int.MaxValue) throw new ArgumentOutOfRangeException(nameof(dataOffset));
@@ -489,11 +505,13 @@ namespace Sylvan.Data.XBase
 			return col.accessor.GetBytes(this, ordinal, (int)dataOffset, buffer, bufferOffset, length);
 		}
 
+		/// <inheritdoc/>
 		public override char GetChar(int ordinal)
 		{
 			throw new NotSupportedException();
 		}
 
+		/// <inheritdoc/>
 		public override long GetChars(int ordinal, long dataOffset, char[]? buffer, int bufferOffset, int length)
 		{
 			if (dataOffset > int.MaxValue)
@@ -505,75 +523,88 @@ namespace Sylvan.Data.XBase
 			return col.accessor.GetChars(this, ordinal, (int)dataOffset, buffer, bufferOffset, length);
 		}
 
+		/// <inheritdoc/>
 		public override string GetDataTypeName(int ordinal)
 		{
 			var col = this.columns[ordinal];
 			return col.DataTypeName?.ToString() ?? col.DBaseDataType.ToString();
 		}
 
+		/// <inheritdoc/>
 		public override DateTime GetDateTime(int ordinal)
 		{
 			var col = this.columns[ordinal];
 			return col.accessor.GetDateTime(this, ordinal);
 		}
 
+		/// <inheritdoc/>
 		public override decimal GetDecimal(int ordinal)
 		{
 			var col = this.columns[ordinal];
 			return col.accessor.GetDecimal(this, ordinal);
 		}
 
+		/// <inheritdoc/>
 		public override double GetDouble(int ordinal)
 		{
 			var col = this.columns[ordinal];
 			return col.accessor.GetDouble(this, ordinal);
 		}
 
+		/// <inheritdoc/>
 		public override IEnumerator GetEnumerator()
 		{
 			return new DbEnumerator(this);
 		}
 
+		/// <inheritdoc/>
 		public override Type GetFieldType(int ordinal)
 		{
 			return this.columns[ordinal].DataType!;
 		}
 
+		/// <inheritdoc/>
 		public override float GetFloat(int ordinal)
 		{
 			var col = this.columns[ordinal];
 			return col.accessor.GetFloat(this, ordinal);
 		}
 
+		/// <inheritdoc/>
 		public override Guid GetGuid(int ordinal)
 		{
 			var col = this.columns[ordinal];
 			return col.accessor.GetGuid(this, ordinal);
 		}
 
+		/// <inheritdoc/>
 		public override short GetInt16(int ordinal)
 		{
 			var col = columns[ordinal];
 			return col.accessor.GetInt16(this, ordinal);
 		}
 
+		/// <inheritdoc/>
 		public override int GetInt32(int ordinal)
 		{
 			var col = columns[ordinal];
 			return col.accessor.GetInt32(this, ordinal);
 		}
 
+		/// <inheritdoc/>
 		public override long GetInt64(int ordinal)
 		{
 			var col = columns[ordinal];
 			return col.accessor.GetInt64(this, ordinal);
 		}
 
+		/// <inheritdoc/>
 		public override string GetName(int ordinal)
 		{
 			return this.columns[ordinal].ColumnName;
 		}
 
+		/// <inheritdoc/>
 		public override int GetOrdinal(string name)
 		{
 			for (int i = 0; i < columns.Length; i++)
@@ -584,18 +615,21 @@ namespace Sylvan.Data.XBase
 			return -1;
 		}
 
+		/// <inheritdoc/>
 		public override string GetString(int ordinal)
 		{
 			var col = this.columns[ordinal];
 			return col.accessor.GetString(this, ordinal);
 		}
 
+		/// <inheritdoc/>
 		public override Stream GetStream(int ordinal)
 		{
 			var col = this.columns[ordinal];
 			return col.accessor.GetStream(this, ordinal);
 		}
 
+		/// <inheritdoc/>
 		public override TextReader GetTextReader(int ordinal)
 		{
 			var col = this.columns[ordinal];
@@ -610,6 +644,7 @@ namespace Sylvan.Data.XBase
 			}
 		}
 
+		/// <inheritdoc/>
 		public override object GetValue(int ordinal)
 		{
 			ThrowIfOutOfRange(ordinal);
@@ -709,6 +744,7 @@ namespace Sylvan.Data.XBase
 		}
 #endif
 
+		/// <inheritdoc/>
 		public override int GetValues(object?[] values)
 		{
 			var l = Math.Min(columns.Length, values.Length);
@@ -719,17 +755,20 @@ namespace Sylvan.Data.XBase
 			return l;
 		}
 
+		/// <inheritdoc/>
 		public override bool IsDBNull(int ordinal)
 		{
 			var col = columns[ordinal];
 			return col.accessor.IsDBNull(this, ordinal);
 		}
 
+		/// <inheritdoc/>
 		public override bool NextResult()
 		{
 			return false;
 		}
 
+		/// <inheritdoc/>
 		public override bool Read()
 		{
 			var recordLen = this.recordLength;
@@ -766,6 +805,7 @@ namespace Sylvan.Data.XBase
 			return true;
 		}
 
+		/// <inheritdoc/>
 		public override async Task<bool> ReadAsync(CancellationToken cancellationToken)
 		{
 			var recordLen = this.recordLength;
@@ -797,16 +837,19 @@ namespace Sylvan.Data.XBase
 			return true;
 		}
 
+		/// <inheritdoc/>
 		public ReadOnlyCollection<DbColumn> GetColumnSchema()
 		{
 			return new ReadOnlyCollection<DbColumn>(columns);
 		}
 
+		/// <inheritdoc/>
 		public override DataTable GetSchemaTable()
 		{
 			return SchemaTable.GetSchemaTable(GetColumnSchema());
 		}
 
+		/// <inheritdoc/>
 		protected override void Dispose(bool disposing)
 		{
 			this.isClosed = true;

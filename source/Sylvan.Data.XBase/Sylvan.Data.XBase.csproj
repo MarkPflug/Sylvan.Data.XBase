@@ -7,5 +7,7 @@
 		<Description>A .NET library for reading xBase (DBase, FoxPro, Clipper, etc) .dbf data files.</Description>
 		<PackageTags>dbf;xbase;dBase;FoxPro</PackageTags>
 		<Nullable>enable</Nullable>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<GenerateDocumentationFile>True</GenerateDocumentationFile>
 	</PropertyGroup>
 </Project>
