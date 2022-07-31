@@ -857,6 +857,7 @@ namespace Sylvan.Data.XBase
 				{
 					return false;
 				}
+				recordIdx++;
 
 				var len = await ReadBlockAsync(stream, recordBuffer, recordLen);
 				if (len != recordLen)
