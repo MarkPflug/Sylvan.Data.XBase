@@ -137,13 +137,13 @@ namespace Sylvan.Data.XBase
 		[Fact]
 		public void Numbers()
 		{
-			Proc("Data/numbers.dbf");
+			Proc("Data/Numbers.dbf");
 		}
 
 		[Fact]
 		public void Numbers2()
 		{
-			Proc("Data/number2.dbf");
+			Proc("Data/Number2.dbf");
 		}
 
 		[Fact]
@@ -169,13 +169,13 @@ namespace Sylvan.Data.XBase
 		[Fact]
 		public void Varchar()
 		{
-			Proc("Data/nulltest.dbf");
+			Proc("Data/NullTest.dbf");
 		}
 
 		[Fact]
 		public void MemoTest()
 		{
-			Proc("Data/nulltest.dbf");
+			Proc("Data/NullTest.dbf");
 		}
 
 		[Fact]
