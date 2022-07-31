@@ -16,6 +16,7 @@ namespace Sylvan.Data.XBase
 		{
 			IgnoreMissingMemo = false;
 			Encoding = null;
+			this.StringFactory = null;
 		}
 
 		/// <summary>
@@ -54,5 +55,10 @@ namespace Sylvan.Data.XBase
 		/// By default, the encoding specified in the file header will be used.
 		/// </remarks>
 		public Encoding? Encoding { get; set; }
+
+		/// <summary>
+		/// A string factory function which can de-dupe strings on construction. Defaults to null.
+		/// </summary>
+		public StringFactory? StringFactory { get; set; }
 	}
 }

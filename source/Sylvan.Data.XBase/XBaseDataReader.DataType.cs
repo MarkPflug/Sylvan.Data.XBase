@@ -82,7 +82,7 @@ namespace Sylvan.Data.XBase
 
 				var span = dr.recordBuffer.AsSpan().Slice(col.offset, col.length);
 				int i;
-				for(i = 0; i < span.Length; i++)
+				for (i = 0; i < span.Length; i++)
 				{
 					if (span[i] != ' ')
 						break;
@@ -250,7 +250,23 @@ namespace Sylvan.Data.XBase
 			{
 #if NETSTANDARD2_1
 				var span = GetRecordSpan(dr, ordinal);
-				if(System.Buffers.Text.Utf8Parser.TryParse(span, out Guid value, out _))
+				if(span.Length > 0 && span[0] == '{')
+				{
+					span = span.Slice(1);
+				}
+				if (span.Length > 32)
+				{
+					for (int i = 33; i < span.Length; i++)
+					{
+						var c = span[i];
+						if (c == ' ' || c == '}')
+						{
+							span = span.Slice(0, i);
+							break;
+						}
+					}
+				}
+				if (System.Buffers.Text.Utf8Parser.TryParse(span, out Guid value, out _))
 				{
 					return value;
 				}
@@ -477,7 +493,7 @@ namespace Sylvan.Data.XBase
 				}
 				i += 1;
 
-				return i == 0 ? string.Empty : new string(buf, 0, i);
+				return i == 0 ? string.Empty : dr.factory(buf, 0, i);
 			}
 		}
 
@@ -498,7 +514,8 @@ namespace Sylvan.Data.XBase
 					? buf[col.offset + col.length - 1]
 					: col.length;
 
-				var str = dr.encoding.GetString(buf, col.offset, length);
+				var l = dr.encoding.GetChars(buf, col.offset, length, dr.textBuffer, 0);
+				var str = dr.factory(dr.textBuffer, 0, l);
 				return str;
 			}
 		}
