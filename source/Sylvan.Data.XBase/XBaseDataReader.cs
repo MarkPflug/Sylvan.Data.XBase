@@ -135,6 +135,8 @@ namespace Sylvan.Data.XBase
 		int cachedRecordRow;
 		int cachedRecordOrdinal;
 
+		StringFactory factory;
+
 		Stream stream;
 		Stream? memoStream;
 
@@ -269,11 +271,14 @@ namespace Sylvan.Data.XBase
 			this.memoBuffer = Array.Empty<byte>();
 			this.cachedRecord = string.Empty;
 			this.textBuffer = Array.Empty<char>();
+			this.factory = (b, o, l) => new string(b, o, l);
 		}
 
 		async Task InitializeAsync(XBaseDataReaderOptions options)
 		{
 			this.readDeletedRecords = options.ReadDeletedRecords;
+			if(options.StringFactory != null)
+				this.factory = options.StringFactory;
 			var buffer = new byte[0x20];
 			var p = 0;
 			var len = await stream.ReadAsync(buffer, 0, buffer.Length);
