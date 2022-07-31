@@ -260,6 +260,29 @@ namespace Sylvan.Data.XBase
 			return reader;
 		}
 
+		/// <summary>
+		/// Creates a new XBaseDataReader.
+		/// </summary>
+		public static async Task<XBaseDataReader> CreateAsync(string dataFile, XBaseDataReaderOptions? options = null)
+		{
+			var dataStream = File.OpenRead(dataFile);
+			var reader = await CreateAsync(dataStream, null, options);
+			reader.ownsStreams = true;
+			return reader;
+		}
+
+		/// <summary>
+		/// Creates a new XBaseDataReader.
+		/// </summary>
+		public static async Task<XBaseDataReader> CreateAsync(string dataFile, string memoFile, XBaseDataReaderOptions? options = null)
+		{
+			var dataStream = File.OpenRead(dataFile);
+			var memoStream = File.OpenRead(memoFile);
+			var reader = await CreateAsync(dataStream, memoStream, options);
+			reader.ownsStreams = true;
+			return reader;
+		}
+
 		XBaseDataReader(Stream stream, Stream? memoStream)
 		{
 			this.stream = stream;
@@ -465,6 +488,9 @@ namespace Sylvan.Data.XBase
 		/// option is enabled.
 		/// </summary>
 		public bool IsDeletedRow { get; private set; }
+
+		/// <summary> Gets the current 1-based row number of the data reader.</summary>
+		public long RowNumber => this.recordIdx;
 
 		/// <inheritdoc/>
 		public override object this[int ordinal] => this.GetValue(ordinal);
@@ -836,6 +862,7 @@ namespace Sylvan.Data.XBase
 				{
 					return false;
 				}
+				recordIdx++;
 
 				var len = await ReadBlockAsync(stream, recordBuffer, recordLen);
 				if (len != recordLen)

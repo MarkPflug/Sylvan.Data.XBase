@@ -4,6 +4,7 @@ using System.IO;
 using System.IO.Compression;
 using System.Net.Http;
 using System.Text;
+using System.Threading.Tasks;
 using Xunit;
 
 namespace Sylvan.Data.XBase
@@ -101,6 +102,28 @@ namespace Sylvan.Data.XBase
 		}
 
 		[Fact]
+		public void RowNumber()
+		{
+			var r = XBaseDataReader.Create("Data/Sample.dbf");
+			var idx = 0;
+			while (r.Read())
+			{
+				Assert.Equal(++idx, r.RowNumber);				
+			}
+		}
+
+		[Fact]
+		public async Task RowNumberAsync()
+		{
+			var r = await XBaseDataReader.CreateAsync("Data/Sample.dbf");
+			var idx = 0;
+			while (await r.ReadAsync())
+			{
+				Assert.Equal(++idx, r.RowNumber);
+			}
+		}
+
+		[Fact]
 		public void Sample()
 		{
 			var r = XBaseDataReader.Create("Data/Sample.dbf", "Data/Sample.fpt");
@@ -131,19 +154,19 @@ namespace Sylvan.Data.XBase
 		[Fact]
 		public void Test3()
 		{
-			Proc("Data/data2.dbf", "Data/data2.fpt");
+			Proc("Data/data2.dbf", "Data/data2.FPT");
 		}
 
 		[Fact]
 		public void Numbers()
 		{
-			Proc("Data/numbers.dbf");
+			Proc("Data/Numbers.dbf");
 		}
 
 		[Fact]
 		public void Numbers2()
 		{
-			Proc("Data/number2.dbf");
+			Proc("Data/Number2.dbf");
 		}
 
 		[Fact]
@@ -169,20 +192,20 @@ namespace Sylvan.Data.XBase
 		[Fact]
 		public void Varchar()
 		{
-			Proc("Data/nulltest.dbf");
+			Proc("Data/NullTest.dbf");
 		}
 
 		[Fact]
 		public void MemoTest()
 		{
-			Proc("Data/nulltest.dbf");
+			Proc("Data/NullTest.dbf");
 		}
 
 		[Fact]
 		public void A()
 		{
 			var ds = File.OpenRead("Data/memobintest.dbf");
-			var ms = File.OpenRead("Data/memobintest.fpt");
+			var ms = File.OpenRead("Data/memobintest.FPT");
 			var dr = XBaseDataReader.Create(ds, ms);
 			while (dr.Read())
 			{

@@ -1,5 +1,12 @@
 # Release Notes
 
+_0.1.2_
+- Add overloads for async Create.
+- Add RowNumber.
+- Fix issue for async Read.
+- Add StringFactory to allow de-duping strings.
+- Improve performance of GetGuid.
+
 _0.1.1_
 - Fix issue with reading from compressed streams on .NET 6.
 - Add code doc comments.
