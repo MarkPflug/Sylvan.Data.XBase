@@ -103,7 +103,7 @@ namespace Sylvan.Data.XBase
 		[Fact]
 		public void Sample()
 		{
-			var r = XBaseDataReader.Create("Data/Sample.dbf", "Data/Sample.fpt");
+			var r = XBaseDataReader.Create("Data/Sample.dbf", "Data/Sample.FPT");
 			while (r.Read())
 			{
 				ProcessRecord(r);
@@ -131,7 +131,7 @@ namespace Sylvan.Data.XBase
 		[Fact]
 		public void Test3()
 		{
-			Proc("Data/data2.dbf", "Data/data2.fpt");
+			Proc("Data/data2.dbf", "Data/data2.FPT");
 		}
 
 		[Fact]
