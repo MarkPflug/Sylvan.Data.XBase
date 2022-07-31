@@ -37,6 +37,13 @@
 		<None Include="$(MSBuildThisFileDirectory)Sylvan.png" Pack="true" PackagePath="">
 			<Visible>false</Visible>
 		</None>
+
+		<None
+			Condition="Exists($(ProjectReadmeFile))"
+			Include="$(ProjectReadmeFile)"
+			Pack="true"
+			PackagePath="readme.md">
+		</None>
 	</ItemGroup>
 
 	<PropertyGroup Condition="$(IsTestProject) == true">
