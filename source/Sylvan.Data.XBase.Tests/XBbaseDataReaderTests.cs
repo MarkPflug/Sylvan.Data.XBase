@@ -4,6 +4,7 @@ using System.IO;
 using System.IO.Compression;
 using System.Net.Http;
 using System.Text;
+using System.Threading.Tasks;
 using Xunit;
 
 namespace Sylvan.Data.XBase
@@ -98,6 +99,28 @@ namespace Sylvan.Data.XBase
 			using var stream = entry.Open();
 			var r = XBaseDataReader.Create(stream);
 			Process(r);
+		}
+
+		[Fact]
+		public void RowNumber()
+		{
+			var r = XBaseDataReader.Create("Data/Sample.dbf");
+			var idx = 0;
+			while (r.Read())
+			{
+				Assert.Equal(++idx, r.RowNumber);				
+			}
+		}
+
+		[Fact]
+		public async Task RowNumberAsync()
+		{
+			var r = await XBaseDataReader.CreateAsync("Data/Sample.dbf");
+			var idx = 0;
+			while (await r.ReadAsync())
+			{
+				Assert.Equal(++idx, r.RowNumber);
+			}
 		}
 
 		[Fact]
