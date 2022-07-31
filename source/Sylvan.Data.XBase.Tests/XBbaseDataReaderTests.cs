@@ -103,7 +103,7 @@ namespace Sylvan.Data.XBase
 		[Fact]
 		public void Sample()
 		{
-			var r = XBaseDataReader.Create("Data/Sample.dbf", "Data/Sample.FPT");
+			var r = XBaseDataReader.Create("Data/Sample.dbf", "Data/Sample.fpt");
 			while (r.Read())
 			{
 				ProcessRecord(r);
@@ -182,7 +182,7 @@ namespace Sylvan.Data.XBase
 		public void A()
 		{
 			var ds = File.OpenRead("Data/memobintest.dbf");
-			var ms = File.OpenRead("Data/memobintest.fpt");
+			var ms = File.OpenRead("Data/memobintest.FPT");
 			var dr = XBaseDataReader.Create(ds, ms);
 			while (dr.Read())
 			{
