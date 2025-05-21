@@ -782,7 +782,7 @@ namespace Sylvan.Data.XBase
 				0xca, 1254,      // Turkish Windows
 				0xcb, 1253,      // Greek Windows
 				0xcc, 1257,      // Baltic Windows
-				0xf0, 1251,      // Cyrillic
+				0xf0, 65001,     // This seems right based on the one file I saw it in.
 			};
 			// *: Not supported by the CodePagesEncodingProvider, unlikely that anyone would care.
 
