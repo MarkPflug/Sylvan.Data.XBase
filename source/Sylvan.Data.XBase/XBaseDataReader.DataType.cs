@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.IO;
+﻿using System.Diagnostics;
 using System.Text;
 
 namespace Sylvan.Data.XBase
@@ -10,6 +7,11 @@ namespace Sylvan.Data.XBase
 	{
 		abstract class DataAccessor
 		{
+			internal static bool IsNullChar(byte b)
+			{
+				return b == ' ' || b == '*';
+			}
+
 			public virtual bool IsDBNull(XBaseDataReader dr, int ordinal)
 			{
 				return false;
@@ -404,7 +406,7 @@ namespace Sylvan.Data.XBase
 				var col = dr.columns[ordinal];
 				var b = dr.recordBuffer;
 				var o = col.offset;
-				return b[o] == ' ';
+				return IsNullChar(b[o]);
 			}
 
 			public override DateTime GetDateTime(XBaseDataReader dr, int ordinal)
@@ -413,7 +415,7 @@ namespace Sylvan.Data.XBase
 				var o = col.offset;
 				var b = dr.recordBuffer;
 
-				if (b[o] == ' ')
+				if (IsNullChar(b[o]))
 					throw new InvalidCastException();
 
 				// TODO: this could probably use some range validation.
@@ -644,7 +646,7 @@ namespace Sylvan.Data.XBase
 			public override bool IsDBNull(XBaseDataReader dr, int ordinal)
 			{
 				var col = dr.columns[ordinal];
-				return dr.recordBuffer[col.offset] == ' ';
+				return IsNullChar(dr.recordBuffer[col.offset]);
 			}
 
 			public override bool GetBoolean(XBaseDataReader dr, int ordinal)
@@ -677,7 +679,7 @@ namespace Sylvan.Data.XBase
 			public override bool IsDBNull(XBaseDataReader dr, int ordinal)
 			{
 				var col = dr.columns[ordinal];
-				return dr.recordBuffer[col.offset + col.length - 1] == ' ';
+				return IsNullChar(dr.recordBuffer[col.offset + col.length - 1]);
 			}
 
 			// uses the base implementation of GetDecimal

@@ -1,5 +1,4 @@
-﻿using System;
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.ObjectModel;
 using System.Data;
 using System.Data.Common;
@@ -291,7 +290,7 @@ namespace Sylvan.Data.XBase
 		{
 			if (!stream.CanRead)
 				throw new ArgumentException();
-			if (!memoStream?.CanRead == false)
+			if (memoStream != null && !memoStream.CanRead)
 				throw new ArgumentException();
 
 			this.stream = stream;
