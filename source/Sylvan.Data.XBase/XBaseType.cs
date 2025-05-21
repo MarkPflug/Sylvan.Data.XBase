@@ -19,6 +19,7 @@
 		VarBinary = (byte)'Q',
 		VarChar = (byte)'V',
 		Blob = (byte)'W',
+		AutoIncrement = (byte)'+',
 	}
 
 	static class XBaseTypeExtensions

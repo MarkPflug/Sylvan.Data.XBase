@@ -549,6 +549,8 @@ namespace Sylvan.Data.XBase
 		{
 			public static MissingMemoAccessor Instance = new MissingMemoAccessor();
 
+			public override bool CanBeNull => true;
+
 			public override bool IsDBNull(XBaseDataReader dr, int ordinal)
 			{
 				return true;
