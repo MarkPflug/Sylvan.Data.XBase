@@ -1,4 +1,5 @@
-﻿using System.Collections;
+﻿using System;
+using System.Collections;
 using System.Collections.ObjectModel;
 using System.Data;
 using System.Data.Common;
@@ -12,6 +13,9 @@ namespace Sylvan.Data.XBase
 	/// </summary>
 	public sealed partial class XBaseDataReader : DbDataReader, IDbColumnSchemaGenerator
 	{
+		const byte DeletedMarker = (byte)'*';
+		const byte FieldTerminatorMarker = 0x0d;
+
 		class XBaseColumn : DbColumn
 		{
 			internal int offset;
@@ -285,6 +289,11 @@ namespace Sylvan.Data.XBase
 
 		XBaseDataReader(Stream stream, Stream? memoStream)
 		{
+			if (!stream.CanRead)
+				throw new ArgumentException();
+			if (!memoStream?.CanRead == false)
+				throw new ArgumentException();
+
 			this.stream = stream;
 			this.memoStream = memoStream;
 			this.ownsStreams = false;
@@ -297,21 +306,108 @@ namespace Sylvan.Data.XBase
 			this.factory = (b, o, l) => new string(b, o, l);
 		}
 
-		async Task InitializeAsync(XBaseDataReaderOptions options)
+		static DateTime GetDate(byte[] buffer, int offset)
 		{
-			this.readDeletedRecords = options.ReadDeletedRecords;
-			if(options.StringFactory != null)
-				this.factory = options.StringFactory;
-			var buffer = new byte[0x20];
-			var p = 0;
-			var len = await stream.ReadAsync(buffer, 0, buffer.Length);
-			if (len != 0x20)
-				throw new InvalidDataException();
+			var y = buffer[offset + 0];
+			var m = buffer[offset + 1];
+			var d = buffer[offset + 2];
 
-			p += len;
+			try
+			{
+				return new DateTime(1900 + y, m, d, 0, 0, 0, DateTimeKind.Utc);
+			}
+			catch { }
+			return DateTime.MinValue;
+		}
 
-			var version = (XBaseVersion)buffer[0];
-			var date = new DateTime(1900 + buffer[1], buffer[2], buffer[3], 0, 0, 0, DateTimeKind.Utc);
+		async Task LoadFoxBaseHeader(XBaseDataReaderOptions options)
+		{
+		    // https://www.clicketyclick.dk/databases/xbase/format/db2_dbf.html#DB2_DBF_NOTE_8_SOURCE
+			var buffer = this.recordBuffer;
+			await stream.ReadAsync(buffer, 1, 7);
+			this.recordCount = BitConverter.ToUInt16(buffer, 1);
+			this.ModifiedDate =  GetDate(buffer, 3);
+			this.recordLength = BitConverter.ToInt16(buffer, 6);
+			this.recordBuffer = new byte[recordLength];
+			this.encoding = options.Encoding ?? Encoding.ASCII;
+			var headerLength = 521;
+
+			int maxTextLength = 0;
+			int len = 0;
+			var p = 8;
+			int fieldOffset = 1;
+			const int MaxFields = 32;
+			var fields = new List<XBaseColumn>(MaxFields);
+			for (int i = 0; i < MaxFields; i++)
+			{
+				len = await stream.ReadAsync(buffer, 0, 1);
+				if (len != 1)
+					throw new InvalidDataException();
+				p += len;
+
+				if (buffer[0] == FieldTerminatorMarker)
+				{
+					break;
+				}
+				len = await stream.ReadAsync(buffer, 1, 0x0f);
+				if (len != 0x0f)
+					throw new InvalidDataException();
+				p += len;
+				var name = ReadZString(buffer, 0, 10);
+				var typeCode = buffer[0x0b];
+				var type = (XBaseType)typeCode;
+				var fieldLength = buffer[12];
+				var fieldAddress = BitConverter.ToInt16(buffer, 13);
+				var decimalCount = buffer[15];
+
+				var field = new XBaseColumn(this, i, name, fieldOffset, fieldLength, type, decimalCount, false, false);
+
+				if (field.DataType == typeof(object) && options.IgnoreUnsupportedTypes == false)
+				{
+					throw new UnsupportedColumnTypeException(i, name, typeCode);
+				}
+
+				switch (field.DBaseDataType)
+				{
+					case XBaseType.VarBinary:
+					case XBaseType.VarChar:
+						break;
+				}
+
+				fieldOffset += fieldLength;
+				fields.Add(field);
+			}
+
+			var textLen = Math.Max(64, encoding.GetMaxCharCount(maxTextLength));
+
+			this.textBuffer = new char[textLen];
+
+			this.columns = fields.Where(f => f.IsHidden != true).ToArray();
+			//this.nullFlagsColumn = fields.FirstOrDefault(f => f.IsHidden == true && f.ColumnName == "_NullFlags");
+
+			var remainingHeaderLength = headerLength - p;
+
+			// we avoid seek operations and use forward only reads
+			// to support reading directly out of non-seekable streams
+			// this is to support reading data directly out of zip files
+			// to support GIS shape data.
+			while (remainingHeaderLength > 0)
+			{
+				var readCount = Math.Min(remainingHeaderLength, buffer.Length);
+				len = await stream.ReadAsync(buffer, 0, readCount);
+				if (len != readCount)
+					throw new InvalidDataException();
+				remainingHeaderLength -= len;
+			}
+		}
+
+		async Task LoadHeader(XBaseDataReaderOptions options)
+		{
+			//https://web.archive.org/web/20150323061445/http://ulisse.elettra.trieste.it/services/doc/dbase/DBFstruct.htm
+			var buffer = this.recordBuffer;
+			await stream.ReadAsync(buffer, 1, 0x1f);
+
+			this.ModifiedDate = GetDate(buffer, 1);
 
 			this.recordCount = BitConverter.ToInt32(buffer, 4);
 			var headerLength = BitConverter.ToInt16(buffer, 8);
@@ -320,6 +416,8 @@ namespace Sylvan.Data.XBase
 
 			var flags = (DBaseFileFlags)buffer[0x1c];
 			var langId = buffer[0x1d];
+
+			var p = 0x20;
 
 			if (options.Encoding != null)
 			{
@@ -345,15 +443,15 @@ namespace Sylvan.Data.XBase
 				}
 			}
 
-			var fields = new List<XBaseColumn>(16);
-
 			if (recordCount < 0)
 				throw new InvalidDataException();
 
 			int maxTextLength = 0;
 
+			var fields = new List<XBaseColumn>(16);
 			var flagIdx = 0;
 			int fieldOffset = 1;
+			int len = 0;
 			for (int i = 0; i < 128; i++)
 			{
 				len = await stream.ReadAsync(buffer, 0, 1);
@@ -361,7 +459,7 @@ namespace Sylvan.Data.XBase
 					throw new InvalidDataException();
 				p += len;
 
-				if (buffer[0] == '\x0d')
+				if (buffer[0] == FieldTerminatorMarker)
 				{
 					break;
 				}
@@ -464,9 +562,42 @@ namespace Sylvan.Data.XBase
 					throw new InvalidDataException();
 				remainingHeaderLength -= len;
 			}
+		}
 
-			this.ModifiedDate = date;
-			this.version = version;
+		async Task InitializeAsync(XBaseDataReaderOptions options)
+		{
+			this.readDeletedRecords = options.ReadDeletedRecords;
+			if(options.StringFactory != null)
+				this.factory = options.StringFactory;
+			
+			this.recordBuffer = new byte[0x20];
+
+			var p = 0;
+			var len = await stream.ReadAsync(recordBuffer, 0, 1);
+			if (len != 1)
+				throw new InvalidDataException();
+
+			p += len;
+			this.version = (XBaseVersion)recordBuffer[0];
+			DateTime date = DateTime.MinValue;
+		
+
+
+			switch (version)
+			{
+				case XBaseVersion.FoxBase:
+					await LoadFoxBaseHeader(options);
+					break;
+				default:
+					await LoadHeader(options);
+					break;
+			}
+
+			
+
+
+
+			
 		}
 
 		string ReadZString(byte[] buffer, int offset, int maxLength)
@@ -816,7 +947,7 @@ namespace Sylvan.Data.XBase
 				if(len != recordLen)
 					throw new InvalidDataException();
 				
-				this.IsDeletedRow = recordBuffer[0] != ' ';
+				this.IsDeletedRow = recordBuffer[0] == DeletedMarker;
 				if (IsDeletedRow && this.readDeletedRecords == false)
 				{
 					continue;
