@@ -409,6 +409,15 @@ namespace Sylvan.Data.XBase
 				return IsNullChar(b[o]);
 			}
 
+			static int Digit(byte[] data, int idx)
+			{
+				var c = data[idx] - '0';
+				if ((uint)c > 9)
+					throw new FormatException();
+				return c;
+
+			}
+
 			public override DateTime GetDateTime(XBaseDataReader dr, int ordinal)
 			{
 				var col = dr.columns[ordinal];
@@ -418,19 +427,17 @@ namespace Sylvan.Data.XBase
 				if (IsNullChar(b[o]))
 					throw new InvalidCastException();
 
-				// TODO: this could probably use some range validation.
-
 				var y =
-					(b[o + 0] - '0') * 1000 +
-					(b[o + 1] - '0') * 100 +
-					(b[o + 2] - '0') * 10 +
-					(b[o + 3] - '0');
+					Digit(b, o + 0) * 1000 +
+					Digit(b, o + 1) * 100 +
+					Digit(b, o + 2) * 10 +
+					Digit(b, o + 3);
 				var m =
-					(b[o + 4] - '0') * 10 +
-					(b[o + 5] - '0');
+					Digit(b, o + 4) * 10 +
+					Digit(b, o + 5);
 				var d =
-					(b[o + 6] - '0') * 10 +
-					(b[o + 7] - '0');
+					Digit(b, o + 6) * 10 +
+					Digit(b, o + 7);
 
 				return new DateTime(y, m, d, 0, 0, 0, DateTimeKind.Unspecified);
 			}
@@ -460,6 +467,7 @@ namespace Sylvan.Data.XBase
 				var date = BitConverter.ToInt32(b, o);
 				var time = BitConverter.ToInt32(b, o + 4);
 				// don't ask me if this magic number has any meaning
+				// This is roughly 4716BC, which apple calendar has as the minimum date according to some forum comments.				
 				var value = DateTime.MinValue.AddDays(date - 1721426).AddMilliseconds(time);
 				return value;
 			}
@@ -774,6 +782,7 @@ namespace Sylvan.Data.XBase
 				0xca, 1254,      // Turkish Windows
 				0xcb, 1253,      // Greek Windows
 				0xcc, 1257,      // Baltic Windows
+				0xf0, 1251,      // Cyrillic
 			};
 			// *: Not supported by the CodePagesEncodingProvider, unlikely that anyone would care.
 

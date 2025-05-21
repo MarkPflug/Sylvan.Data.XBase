@@ -232,7 +232,7 @@ namespace Sylvan.Data.XBase
 			Process(r);
 		}
 
-		int Process(XBaseDataReader r)
+		public static int Process(XBaseDataReader r)
 		{
 			var schema = r.GetColumnSchema();
 			var c = 0;
