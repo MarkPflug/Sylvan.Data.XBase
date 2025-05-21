@@ -466,8 +466,8 @@ namespace Sylvan.Data.XBase
 				var b = dr.recordBuffer;
 				var date = BitConverter.ToInt32(b, o);
 				var time = BitConverter.ToInt32(b, o + 4);
-				// don't ask me if this magic number has any meaning
-				// This is roughly 4716BC, which apple calendar has as the minimum date according to some forum comments.				
+				// this magic epoch appears related to:
+				// https://quasar.as.utexas.edu/BillInfo/JulianDatesG.html				
 				var value = DateTime.MinValue.AddDays(date - 1721426).AddMilliseconds(time);
 				return value;
 			}
