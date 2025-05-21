@@ -576,6 +576,7 @@ namespace Sylvan.Data.XBase
 
 		async Task LoadHeader8c(XBaseDataReaderOptions options)
 		{
+			//https://www.dbase.com/Knowledgebase/INT/db7_file_fmt.htm
 			var buffer = this.recordBuffer;
 			await stream.ReadAsync(buffer, 1, 0x1f);
 
