@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.IO;
+﻿using System.Diagnostics;
 using System.Text;
 
 namespace Sylvan.Data.XBase
@@ -10,6 +7,11 @@ namespace Sylvan.Data.XBase
 	{
 		abstract class DataAccessor
 		{
+			internal static bool IsNullChar(byte b)
+			{
+				return b == ' ' || b == '*';
+			}
+
 			public virtual bool IsDBNull(XBaseDataReader dr, int ordinal)
 			{
 				return false;
@@ -404,7 +406,16 @@ namespace Sylvan.Data.XBase
 				var col = dr.columns[ordinal];
 				var b = dr.recordBuffer;
 				var o = col.offset;
-				return b[o] == ' ';
+				return IsNullChar(b[o]);
+			}
+
+			static int Digit(byte[] data, int idx)
+			{
+				var c = data[idx] - '0';
+				if ((uint)c > 9)
+					throw new FormatException();
+				return c;
+
 			}
 
 			public override DateTime GetDateTime(XBaseDataReader dr, int ordinal)
@@ -413,22 +424,20 @@ namespace Sylvan.Data.XBase
 				var o = col.offset;
 				var b = dr.recordBuffer;
 
-				if (b[o] == ' ')
+				if (IsNullChar(b[o]))
 					throw new InvalidCastException();
 
-				// TODO: this could probably use some range validation.
-
 				var y =
-					(b[o + 0] - '0') * 1000 +
-					(b[o + 1] - '0') * 100 +
-					(b[o + 2] - '0') * 10 +
-					(b[o + 3] - '0');
+					Digit(b, o + 0) * 1000 +
+					Digit(b, o + 1) * 100 +
+					Digit(b, o + 2) * 10 +
+					Digit(b, o + 3);
 				var m =
-					(b[o + 4] - '0') * 10 +
-					(b[o + 5] - '0');
+					Digit(b, o + 4) * 10 +
+					Digit(b, o + 5);
 				var d =
-					(b[o + 6] - '0') * 10 +
-					(b[o + 7] - '0');
+					Digit(b, o + 6) * 10 +
+					Digit(b, o + 7);
 
 				return new DateTime(y, m, d, 0, 0, 0, DateTimeKind.Unspecified);
 			}
@@ -457,7 +466,8 @@ namespace Sylvan.Data.XBase
 				var b = dr.recordBuffer;
 				var date = BitConverter.ToInt32(b, o);
 				var time = BitConverter.ToInt32(b, o + 4);
-				// don't ask me if this magic number has any meaning
+				// this magic epoch appears related to:
+				// https://quasar.as.utexas.edu/BillInfo/JulianDatesG.html				
 				var value = DateTime.MinValue.AddDays(date - 1721426).AddMilliseconds(time);
 				return value;
 			}
@@ -546,6 +556,8 @@ namespace Sylvan.Data.XBase
 		sealed class MissingMemoAccessor : DataAccessor
 		{
 			public static MissingMemoAccessor Instance = new MissingMemoAccessor();
+
+			public override bool CanBeNull => true;
 
 			public override bool IsDBNull(XBaseDataReader dr, int ordinal)
 			{
@@ -644,7 +656,7 @@ namespace Sylvan.Data.XBase
 			public override bool IsDBNull(XBaseDataReader dr, int ordinal)
 			{
 				var col = dr.columns[ordinal];
-				return dr.recordBuffer[col.offset] == ' ';
+				return IsNullChar(dr.recordBuffer[col.offset]);
 			}
 
 			public override bool GetBoolean(XBaseDataReader dr, int ordinal)
@@ -677,7 +689,7 @@ namespace Sylvan.Data.XBase
 			public override bool IsDBNull(XBaseDataReader dr, int ordinal)
 			{
 				var col = dr.columns[ordinal];
-				return dr.recordBuffer[col.offset + col.length - 1] == ' ';
+				return IsNullChar(dr.recordBuffer[col.offset + col.length - 1]);
 			}
 
 			// uses the base implementation of GetDecimal
@@ -770,6 +782,7 @@ namespace Sylvan.Data.XBase
 				0xca, 1254,      // Turkish Windows
 				0xcb, 1253,      // Greek Windows
 				0xcc, 1257,      // Baltic Windows
+				0xf0, 65001,     // This seems right based on the one file I saw it in.
 			};
 			// *: Not supported by the CodePagesEncodingProvider, unlikely that anyone would care.
 

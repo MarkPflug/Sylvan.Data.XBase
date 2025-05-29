@@ -62,6 +62,11 @@ namespace Sylvan.Data.XBase
 
 			while (r.Read())
 			{
+				for(var i = 0; i < r.FieldCount; i++)
+				{
+					// we should always be able to access the value as a string.
+					var str = r.GetString(i);
+				}
 				ProcessRecord(r);
 			}
 		}				
@@ -227,7 +232,7 @@ namespace Sylvan.Data.XBase
 			Process(r);
 		}
 
-		int Process(XBaseDataReader r)
+		public static int Process(XBaseDataReader r)
 		{
 			var schema = r.GetColumnSchema();
 			var c = 0;
