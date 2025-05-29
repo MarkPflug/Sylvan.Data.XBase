@@ -1,5 +1,9 @@
 # Release Notes
 
+_0.1.3_
+- Add support for version 0x02 and 0x8C files.
+- Fix range checks when parsing dates.
+
 _0.1.2_
 - Add overloads for async Create.
 - Add RowNumber.
